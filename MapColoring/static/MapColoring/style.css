@@ -1,0 +1,29 @@
+body {
+	background: #cfd8dc;
+}
+h4 {
+	margin: 8px 0;
+}
+p {
+	margin: 15px 0;
+}
+#chartdiv {
+	width: 100%;
+	height: 494px;
+	background: white;
+}
+#controlsDiv, #resultsDiv {
+	display: block;
+	padding: 8px;
+	margin-top: 8px;
+	border: 1px solid #607d8b;
+}
+#controlsDiv #selectColorsBar .checkbox {
+	display: inline;
+	margin: 0 8px;
+}
+#controlsDiv #buttonBar button, #resultsDiv button {
+	display: inline;
+	margin: 0 4px;
+	padding: 6px;
+}

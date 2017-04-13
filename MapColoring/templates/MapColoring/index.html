@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Coloring CSP Solver</title>
+    
+    <!-- Style Resources -->
+    <link rel="stylesheet" type="text/css" href="{% static 'MapColoring/style.css' %}">
+
+    <!-- SweetAlert -->
+    <script src="{% static 'MapColoring/sweetalert.min.js' %}"></script>
+    <link rel="stylesheet" type="text/css" href="{% static 'MapColoring/sweetalert.css' %}">
+
+    <!-- Resources -->
+    <script src="https://www.amcharts.com/lib/3/ammap.js"></script>
+    <script src="https://www.amcharts.com/lib/3/maps/js/worldLow.js"></script>
+    <script src="https://www.amcharts.com/lib/3/themes/dark.js"></script>
+    <script src="https://www.amcharts.com/lib/3/plugins/export/export.min.js"></script>
+    <link rel="stylesheet" href="https://www.amcharts.com/lib/3/plugins/export/export.css" type="text/css" media="all" />
+
+    <!-- Chart code -->
+    <script>
+    var neighbourDict = {};
+    var selectedStates = [];
+    var map = AmCharts.makeChart( "chartdiv", {
+
+      "type": "map",
+      "theme": "dark",
+      "projection": "miller",
+      "panEventsEnabled": true,
+
+      "dataProvider": {
+        "map": "worldLow",
+        "getAreasFromMap": true
+      },
+      "areasSettings": {
+        "autoZoom": false,
+        "color": "#CDCDCD",
+        "colorSolid": "#5EB7DE",
+        "selectedColor": "#5EB7DE",
+        "outlineColor": "#666666",
+        "rollOverColor": "#88CAE7",
+        "rollOverOutlineColor": "#FFFFFF",
+        "selectable": true
+      },
+      "smallMap": {},
+      "listeners": [ {
+        "event": "clickMapObject",
+        "method": function( event ) {
+          // deselect the area by assigning all of the dataProvider as selected object
+          map.selectedObject = map.dataProvider;
+
+          // toggle showAsSelected
+          var area = event.mapObject;
+          area.showAsSelected = !area.showAsSelected;
+          // find neighbours for the selected country, if not already found
+          if(!neighbourDict.hasOwnProperty(area.id)) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    json = JSON.parse(this.responseText);
+                    if(json.hasOwnProperty('geonames')) {
+                        // add neighbours for selected area
+                        neighbourDict[area.id]=[];
+                        for (var i = json.geonames.length - 1; i >= 0; i--)
+                            neighbourDict[area.id].push(json.geonames[i].countryCode);
+                    } else {
+                        // display alert on error
+                        showAlert("Geonames Decoding Exception!", json.status.message);
+                    }
+                }
+            };
+            // make synchronous ajax request
+            xhttp.open('GET', 'http://api.geonames.org/neighboursJSON?country='+area.id+'&username={{username}}', false);
+            try {
+                xhttp.send();
+            } catch(err) {
+                showAlert(err.name, err.message);
+            }
+          }
+
+          // bring it to an appropriate color
+          map.returnInitialColor( event.mapObject );
+
+          // let's build a list of currently selected states in selectedStates
+          selectedStates = [];
+          for ( var i in map.dataProvider.areas ) {
+            area = map.dataProvider.areas[ i ];
+            if ( area.showAsSelected ) {
+                selectedStates.push( area.id );
+            }
+          }
+          // console.log(selectedStates);
+          // console.log(neighbourDict);
+          // map.getObjectById('IN').colorReal='#ABCDEF';
+          // map.getObjectById('IN').validate();
+          // console.log(map.getObjectById('IN'));
+        }
+      } ],
+      "export": {
+        "enabled": true,
+        "position": "bottom-right"
+      }
+    } );
+
+    function showAlert(title, msg) {
+        swal({
+          title: title,
+          text: msg,
+          type: "warning",
+          confirmButtonText: "Ok"
+        });
+    }
+
+    function submitForm(algorithm) {
+        if(selectedStates.length <= 0)
+            return showAlert('No country selected!', 'Please select at least one country.');
+        if(!selectedStates.every(elem => neighbourDict.hasOwnProperty(elem)))
+            return showAlert('Sorry!', 'Currently we are unable to find neighbours for all selected countries.\nPlease make sure that Geonames API is working correctly and you have an active internet connection.');
+        
+        // construct colors input for form submission
+        var colors = '';
+        var checkboxes = document.getElementsByClassName('checkbox');
+        for (var i = 0; i < checkboxes.length; i++) {
+            if(checkboxes[i].firstElementChild.checked)
+                colors+=checkboxes[i].firstElementChild.value;
+        };
+        if(colors == '')
+            return showAlert('No colour chosen!', 'Please choose atleast one colour.');
+
+        // construct neighbours input for form submission
+        var neighbours = '';
+        for (var i = selectedStates.length - 1; i >= 0; i--) {
+            neighbours += selectedStates[i]+':';
+            for (var j = i-1; j >= 0; j--) {
+                if(neighbourDict[selectedStates[i]].indexOf(selectedStates[j]) != -1)
+                    neighbours += ' '+selectedStates[j];
+            };
+            if(i!=0)
+                neighbours += ';';
+        };
+
+        var form = document.getElementById('form');
+        form.colors.value = colors;
+        form.countries.value = selectedStates;
+        form.neighbours.value = neighbours;
+        form.algorithm.value = algorithm;
+        form.submit();
+        // console.log('neighbours: '+neighbours);
+        // console.log(selectedStates);
+        // console.log(neighbourDict);
+        //console.log(form.algorithm.name);
+    }
+    </script>
+</head>
+
+<body>
+    <div id="chartdiv"></div>
+    <div id="controlsDiv">
+        <h4>1. Select areas to apply map coloring.</h4>
+        <h4>2. Choose colours for colouring the selected areas in map:</h4>
+        <div id="selectColorsBar">
+            {% for key, color in colors.iteritems %}
+            <div class="checkbox">
+                <input type="checkbox" id="{{key}}" value="{{key}}" style="background-color:{{color.colorCode}};">
+                <label for="{{key}}" style="color:{{color.colorCode}};">{{color.name}}</label>
+            </div>
+            {% endfor %}
+        </div>
+        <h4>3. Choose an algorithm:</h4>
+        <div id="buttonBar">
+            <a href="{% url 'MapColoring:index' %}" style="position:absolute;top:140px;left:8px;display:inline;"><button>Reset</button></a>
+            {% for algorithm in algorithms %}
+                <button onclick="submitForm({{forloop.counter0}})">{{algorithm}}</button>
+            {% endfor %}
+        </div>
+    </div>
+    <form id="form" action="{% url 'MapColoring:result' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="colors" required="required">
+        <input type="hidden" name="countries" required="required">
+        <input type="hidden" name="neighbours" required="required">
+        <input type="hidden" name="algorithm" required="required">
+    </form>
+</body>
+</html>

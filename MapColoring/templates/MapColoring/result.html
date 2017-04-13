@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Result | Map Coloring CSP Solver</title>
+    
+    <!-- Style Resources -->
+    <link rel="stylesheet" type="text/css" href="{% static 'MapColoring/style.css' %}">
+
+    <!-- SweetAlert -->
+    <script src="{% static 'MapColoring/sweetalert.min.js' %}"></script>
+    <link rel="stylesheet" type="text/css" href="{% static 'MapColoring/sweetalert.css' %}">
+
+    <!-- Resources -->
+    <script src="https://www.amcharts.com/lib/3/ammap.js"></script>
+    <script src="https://www.amcharts.com/lib/3/maps/js/worldLow.js"></script>
+    <script src="https://www.amcharts.com/lib/3/themes/dark.js"></script>
+    <script src="https://www.amcharts.com/lib/3/plugins/export/export.min.js"></script>
+    <link rel="stylesheet" href="https://www.amcharts.com/lib/3/plugins/export/export.css" type="text/css" media="all" />
+
+    <!-- Chart code -->
+    <script>
+    var coloredCountries = [
+      {% if result is not None %}
+        {% for key, value in result.items %}
+          {
+            "id": "{{ key }}",
+            "color": "{{ value }}",
+            "rollOverColor": "{{ value }}"
+          }, 
+        {% endfor %}
+      {% endif %}
+    ];
+    var copyCountries = coloredCountries.slice();
+
+    var map = AmCharts.makeChart( "chartdiv", {
+
+      "type": "map",
+      "theme": "dark",
+      "projection": "miller",
+      "panEventsEnabled": true,
+
+      "dataProvider": {
+        "map": "worldLow",
+        "getAreasFromMap": true,
+        "areas": coloredCountries
+      },
+      "areasSettings": {
+        "autoZoom": false,
+        "color": "#CDCDCD",
+        "colorSolid": "#5EB7DE",
+        "selectedColor": "#5EB7DE",
+        "outlineColor": "#666666",
+        "rollOverColor": "#88CAE7",
+        "rollOverOutlineColor": "#FFFFFF",
+        "selectable": false
+      },
+      //"smallMap": {},
+      "export": {
+        "enabled": true,
+        "position": "bottom-right"
+      }
+    } );
+
+    window.onload = function() {
+      if(copyCountries.length <= 0) {
+        swal({
+          title: 'Colouring Failed!',
+          text: 'Unable to colour map with given colour set.',
+          type: "error",
+          confirmButtonText: "<< Go Back"
+        },
+        function() {
+          window.location = '{% url 'MapColoring:index' %}';
+        });
+      }
+      document.getElementById('selectedCountries').innerHTML += getCountryNames();
+    }
+
+    function getCountryNames() {
+      var str='';
+      for (var i = copyCountries.length - 1; i >= 0; i--) {
+        if(copyCountries[i]['color'] == '')
+          str += map.getObjectById(copyCountries[i]['id']).title + ' (can be colored using any colour), ';
+        else
+          str += '<span style="color:' + copyCountries[i]['color'] + '">' + map.getObjectById(copyCountries[i]['id']).title + '</span>, ';
+      };
+      return str;
+    }
+    </script>
+</head>
+
+<body>
+    <div id="chartdiv"></div>
+    <div id="resultsDiv">
+        <a href="{% url 'MapColoring:index' %}" style="position:absolute;top:140px;left:8px;display:inline;"><button>Reset</button></a>
+        <p id="selectedColours"><b>Colours chosen for colouring:</b> 
+        {% for color, code in chosenColors.items %}
+          <span style="color:{{code}};">{{color}}</span>, 
+        {% endfor %}
+        </p>
+        <p id="selectedCountries"><b>Countries chosen for colouring:</b> </p>
+        <p id="selectedAlgorithm"><b>Algorithm chosen for colouring:</b> {{ algorithm }}</p>
+        <p id="runTime"><b>Run time of algorithm:</b> {{ runTime }} seconds.</p>
+    </div>
+</body>
+</html>
